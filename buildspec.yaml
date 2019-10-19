@@ -7,4 +7,4 @@ phases:
     commands:
       - aws cloudformation package --template-file main.yaml --s3-bucket $S3Bucket --output-template-file packagedtemplate.yaml
 artifacts:
-  files: packagedtemplate.yaml
+  files: '**/*'
