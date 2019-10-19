@@ -8,7 +8,7 @@ phases:
       - cd unpack && pip install -r requirements.txt
   build:
     commands:
-      - cd unpack
+      - cd.. && cd unpack
       - zip -r function.zip .
       - aws s3 sync function.zip "s3://$S3Bucket/lambda-code"
       - cd .. && cd test
