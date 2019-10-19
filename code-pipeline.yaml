@@ -269,7 +269,7 @@ Resources:
                 Owner: 'Kamran-saeed'
                 Repo: !Ref RepoName
                 Branch: !Ref BranchName
-                PollForSourceChanges: true
+                PollForSourceChanges: false
                 OAuthToken: 'c7e2bee44b4514d250d48ab4b516d45464d0aa73'
               OutputArtifacts:
                 - Name: SourceCode
