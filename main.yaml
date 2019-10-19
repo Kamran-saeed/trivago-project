@@ -115,7 +115,7 @@ Resources:
       Role: !GetAtt LambdaRole.Arn
       Code:
         S3Bucket: !ImportValue s3bucket-name
-        S3Key: 'function.zip'
+        S3Key: 'lambda-code/function.zip'
       Runtime: python3.7
       Tags:
         - Key: Project
