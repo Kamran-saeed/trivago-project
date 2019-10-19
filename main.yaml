@@ -110,11 +110,11 @@ Resources:
   LambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Handler: Lambda.handler
+      Handler: unpack.lambda_handler
       Timeout: 5
       Role: !GetAtt LambdaRole.Arn
       Code:
-        S3Bucket: !Sub '${Project}-lambda-code-${Environment}'
+        S3Bucket: !ImportValue s3bucket-name
         S3Key: 'Lambda.zip'
       Runtime: python3.7
       Tags:
