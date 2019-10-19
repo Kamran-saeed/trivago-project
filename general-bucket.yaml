@@ -10,7 +10,7 @@ Parameters:
   environment:
     Type: String
     Description: Environment name
-    AllowedValues: [dev, qa, uat, prd]
+    AllowedValues: [dev, qa, uat, prod]
     Default: dev
 
   department:
@@ -51,3 +51,15 @@ Resources:
           Value: !Ref department
         - Key: Owner
           Value: !Ref owner
+
+Outputs:
+  S3BucketName:
+    Description: S3 bucket name
+    Value: !Ref S3Bucket
+    Export:
+      Name: 's3bucket-name'
+  S3BucketArn:
+    Description: S3 bucket Arn
+    Value: !GetAtt S3Bucket.Arn
+    Export:
+      Name: 's3bucket-arn'

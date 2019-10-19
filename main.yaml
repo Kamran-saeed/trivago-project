@@ -221,12 +221,3 @@ Resources:
             Enabled: true
             LogGroupName: !Ref KinesisLogGroup
             LogStreamName: !Ref KinesisLogStream
-
-Outputs:
-  S3BucketName:
-    Description: S3 bucket name
-    Value: !Ref S3Bucket
-
-  S3BucketArn:
-    Description: S3 bucket Arn
-    Value: !GetAtt S3Bucket.Arn

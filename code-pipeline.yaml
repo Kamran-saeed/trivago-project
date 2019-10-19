@@ -11,7 +11,7 @@ Parameters:
   Environment:
     Type: String
     Description: Environment name
-    AllowedValues: [dev, qa, uat, prd]
+    AllowedValues: [dev, qa, uat, prod]
     Default: dev
 
   Department:
@@ -30,15 +30,10 @@ Parameters:
     Type: String
     Default: 'trivago-project'
 
-  ArtifactBucketName:
-    Description: "The S3 bucket to use for codepipeline artifacts"
-    Type: String
-    Default: 'data-collection-general-dev'
-
   BranchName:
     Description: "The git branch to operate from"
     Type: String
-    Default: 'master'
+    Default: 'dev'
 
 Conditions:
   IsProductionEnvironment: !Equals [ 'prod', !Ref Environment]
@@ -55,6 +50,7 @@ Resources:
             Principal:
               Service: codebuild.amazonaws.com
             Action: 'sts:AssumeRole'
+      Path: /
       RoleName: !Join ["-", [ !Ref Project, 'codebuild-role', !Ref Environment]]
       Tags:
         - Key: Project
@@ -124,6 +120,7 @@ Resources:
               Service: codepipeline.amazonaws.com
             Action: 'sts:AssumeRole'
       RoleName: !Join ["-", [ !Ref Project, 'codepipeline-role', !Ref Environment]]
+      Path: /
       Tags:
         - Key: Project
           Value: !Ref Project
@@ -204,15 +201,6 @@ Resources:
             Resource: "*"
       Roles:
         - !Ref CodePipelineCloudFormationDeployRole
-      Tags:
-        - Key: Project
-          Value: !Ref Project
-        - Key: Env
-          Value: !Ref Environment
-        - Key: Dept
-          Value: !Ref Department
-        - Key: Owner
-          Value: !Ref Owner
 
   BuildProject:
     Type: AWS::CodeBuild::Project
@@ -226,7 +214,11 @@ Resources:
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: /aws/codebuild/python3.7
+        Image: aws/codebuild/standard:2.0
+        EnvironmentVariables:
+          - Name: S3Bucket
+            Value: !ImportValue s3bucket-name
+            Type: PLAINTEXT
       Artifacts:
         Type: CODEPIPELINE
       Tags:
@@ -247,14 +239,16 @@ Resources:
           Protocol: email
 
   Pipeline:
+    DependsOn:
+      - CodePipelinePolicy
     Type: "AWS::CodePipeline::Pipeline"
     Properties:
       Name: !Join [ '-', [!Ref Project, codepipeline, !Ref Environment]]
-      RoleArn: !Ref CodePipelineRole
+      RoleArn: !GetAtt CodePipelineRole.Arn
       RestartExecutionOnUpdate: true
       ArtifactStore:
         Type: S3
-        Location: !Ref ArtifactBucketName
+        Location: !ImportValue s3bucket-name
       Stages:
         - Name: Source
           Actions:
@@ -270,7 +264,7 @@ Resources:
                 Repo: !Ref RepoName
                 Branch: !Ref BranchName
                 PollForSourceChanges: false
-                OAuthToken: 'c7e2bee44b4514d250d48ab4b516d45464d0aa73'
+                OAuthToken: '9a23b9b1edd3d06c4c26a1de454bc2d17a8caf67'
               OutputArtifacts:
                 - Name: SourceCode
         - Name: Build
@@ -291,8 +285,6 @@ Resources:
         - Name: Deploy
           Actions:
             - Name: Approval
-              !If
-            - IsProductionEnvironment
               ActionTypeId:
                 Category: Approval
                 Owner: AWS
@@ -302,7 +294,6 @@ Resources:
                 NotificationArn: !Ref CodePipelineSNSTopic
                 CustomData: !Sub 'A new request was created for the ${Environment} stack. Do you want to implement the changes?'
               RunOrder: '1'
-            - !Ref "AWS::NoValue"
             - Name: DeployAction
               ActionTypeId:
                 Category: Deploy
@@ -318,7 +309,7 @@ Resources:
                 Capabilities: CAPABILITY_NAMED_IAM
                 TemplateConfiguration: !Sub "BuildOutput::env/${Environment}-parameters.json"
                 TemplatePath: BuildOutput::packagedtemplate.yaml
-                RoleArn: !Ref CodePipelineCloudFormationDeployRole
+                RoleArn: !GetAtt CodePipelineCloudFormationDeployRole.Arn
       Tags:
         - Key: Project
           Value: !Ref Project
