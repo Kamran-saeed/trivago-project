@@ -1,0 +1,10 @@
+version: 0.1
+phases:
+  install:
+    runtime-versions:
+      python: 3.7
+  build:
+    commands:
+      - aws cloudformation package --template-file main.yaml --s3-bucket $S3Bucket --output-template-file packagedtemplate.yaml
+artifacts:
+  files: packagedtemplate.yaml

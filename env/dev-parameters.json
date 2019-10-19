@@ -1,0 +1,14 @@
+{ 
+    "Parameters": {
+       "Project": "data-collection",
+       "Environment": "dev",
+       "Department": "Rnd",
+       "Owner": "kamransaeed1000@gmail.com",
+       "bucketversioningstatus": "Suspended",
+       "bucketname": "sample-bucket",
+       "kinesisbufferinterval": "60",
+       "kinesisbuffersize": "50",
+       "kinesiscompressionformat": "UNCOMPRESSED",
+       "kinesisprocessrecordstatus": "true"
+    }
+}
