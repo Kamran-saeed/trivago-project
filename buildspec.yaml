@@ -8,10 +8,10 @@ phases:
       - pip install -r unpack/requirements.txt
   build:
     commands:
-      - cd unpacka
+      - cd unpack
       - zip -r function.zip .
       - aws s3 sync . "s3://$S3Bucket/lambda-code"
-      - cd ...
+      - cd ..
       - python -m pytest test/test_unpack.py -v
       - aws cloudformation package --template-file main.yaml --s3-bucket $S3Bucket --output-template-file packagedtemplate.yaml
 artifacts:
