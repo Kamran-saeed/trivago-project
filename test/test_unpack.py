@@ -2,7 +2,7 @@ import unittest
 import base64
 import json
 
-import lambda_handler
+from unpack import lambda_handler
 
 EVENT = {
     'records': [
