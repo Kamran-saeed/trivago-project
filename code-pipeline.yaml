@@ -264,7 +264,7 @@ Resources:
                 Repo: !Ref RepoName
                 Branch: !Ref BranchName
                 PollForSourceChanges: false
-                OAuthToken: '9a23b9b1edd3d06c4c26a1de454bc2d17a8caf67'
+                OAuthToken: '8896a4a9c05a743aca80a33a77de7352f459ec2a'
               OutputArtifacts:
                 - Name: SourceCode
         - Name: Build
