@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template will create resources for trivago's cicd pipeline for advertiser accommodation data on AWS.
+
+Parameters:
+  project:
+    Type: String
+    Description: Project name
+    Default: data-collection
+  
+  environment:
+    Type: String
+    Description: Environment name
+    AllowedValues: [dev, qa, uat, prd]
+    Default: dev
+
+  department:
+    Type: String
+    Description: Describe which internal department owns this resource
+    Default: Rnd
+
+  owner:
+    Type: String
+    Description: E-mail address, used to identify who is responsible for the resource
+    ConstraintDescription: Must be a valid e-mail address (someone@example.com)
+    AllowedPattern: ^(("[\w-\s]+")|([\w-]+(?:\.[\w-]+)*)|("[\w-\s]+")([\w-]+(?:\.[\w-]+)*))(@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,6}(?:\.[a-z]{2})?)$)|(@\[?((25[0-5]\.|2[0-4][0-9]\.|1[0-9]{2}\.|[0-9]{1,2}\.))((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){2}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\]?$)
+
+  bucketversioningstatus:
+    Type: String
+    Description: Versioning status for this bucket which can be suspended or enabled
+    AllowedValues: [Suspended, Enabled]
+    Default: Suspended
+
+  bucketname:
+    Type: String
+    Description: Name of bucket
+    Default: general
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ["-", [ !Ref project, !Ref bucketname, !Ref environment]]
+      VersioningConfiguration:
+        Status: !Ref bucketversioningstatus
+      Tags:
+        - Key: Project
+          Value: !Ref project
+        - Key: Env
+          Value: !Ref environment
+        - Key: Dept
+          Value: !Ref department
+        - Key: Owner
+          Value: !Ref owner

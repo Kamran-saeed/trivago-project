@@ -1,0 +1,330 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Code pipeline Example Cross Account"
+
+Parameters:
+
+  Project:
+    Type: String
+    Description: Project name
+    Default: data-collection
+  
+  Environment:
+    Type: String
+    Description: Environment name
+    AllowedValues: [dev, qa, uat, prd]
+    Default: dev
+
+  Department:
+    Type: String
+    Description: Describe which internal department owns this resource
+    Default: Rnd
+
+  Owner:
+    Type: String
+    Description: E-mail address, used to identify who is responsible for the resource
+    ConstraintDescription: Must be a valid e-mail address (someone@example.com)
+    AllowedPattern: ^(("[\w-\s]+")|([\w-]+(?:\.[\w-]+)*)|("[\w-\s]+")([\w-]+(?:\.[\w-]+)*))(@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,6}(?:\.[a-z]{2})?)$)|(@\[?((25[0-5]\.|2[0-4][0-9]\.|1[0-9]{2}\.|[0-9]{1,2}\.))((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){2}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\]?$)
+
+  RepoName:
+    Description: "Name of the repo to clone"
+    Type: String
+    Default: 'trivago-project'
+
+  ArtifactBucketName:
+    Description: "The S3 bucket to use for codepipeline artifacts"
+    Type: String
+    Default: 'data-collection-general-dev'
+
+  BranchName:
+    Description: "The git branch to operate from"
+    Type: String
+    Default: 'master'
+
+Conditions:
+  IsProductionEnvironment: !Equals [ 'prod', !Ref Environment]
+
+Resources:
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      RoleName: !Join ["-", [ !Ref Project, 'codebuild-role', !Ref Environment]]
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+  CodeBuildPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Join ["-", [ !Ref Project, codebuild-policy, !Ref Environment]]
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - codebuild:*
+              - s3:*
+              - iam:PassRole
+              - iam:GetRole
+              - iam:CreateRole
+              - iam:PutRolePolicy
+              - iam:AttachRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:DetachRolePolicy
+              - iam:DeleteRole
+              - iam:getRolePolicy
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:ListRoleTags
+              - lambda:Get*
+              - lambda:List*
+              - lambda:CreateFunction
+              - lambda:AddPermission
+              - lambda:CreateAlias
+              - lambda:InvokeFunction
+              - lambda:PublishVersion
+              - lambda:RemovePermission
+              - lambda:Update*
+              - lambda:Delete*
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogGroups
+              - logs:FilterLogEvents
+              - logs:DescribeLogStreams
+              - logs:DeleteLogGroup
+              - cloudwatch:GetMetricStatistics
+              - events:Put*
+              - events:DescribeRule
+            Resource: "*"
+      Roles:
+        - !Ref CodeBuildRole
+  
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: 'sts:AssumeRole'
+      RoleName: !Join ["-", [ !Ref Project, 'codepipeline-role', !Ref Environment]]
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+  CodePipelinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Join ["-", [ !Ref Project, codepipeline-policy, !Ref Environment]]
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - codepipeline:*
+              - iam:ListRoles
+              - cloudformation:*
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+              - iam:PassRole
+              - s3:*
+            Resource: "*"
+      Roles:
+        - !Ref CodePipelineRole
+
+  CodePipelineCloudFormationDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ["-", [ !Ref Project, 'cf-deploy-role', !Ref Environment]]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+  CFDeployerPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Join ["-", [ !Ref Project, cf-deploy-policy, !Ref Environment]]
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:CreatePolicy
+              - iam:GetRole
+              - iam:DeleteRole
+              - iam:PutRolePolicy
+              - iam:PassRole
+              - iam:DeleteRolePolicy
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - cloudformation:*
+              - s3:PutObject
+              - s3:GetBucketPolicy
+              - s3:GetObject
+              - s3:ListBucket
+            Resource: "*"
+      Roles:
+        - !Ref CodePipelineCloudFormationDeployRole
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Join [ '-', [!Ref Project, codebuildproject, !Ref Environment]]
+      Description: !Sub "CodeBuild project for data collection"
+      ServiceRole: !Ref CodeBuildRole
+      TimeoutInMinutes: 15
+      Source:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: /aws/codebuild/python3.7
+      Artifacts:
+        Type: CODEPIPELINE
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+  
+  CodePipelineSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint: !Ref Owner
+          Protocol: email
+
+  Pipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: !Join [ '-', [!Ref Project, codepipeline, !Ref Environment]]
+      RoleArn: !Ref CodePipelineRole
+      RestartExecutionOnUpdate: true
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucketName
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              RunOrder: 1
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: 1
+              Configuration:
+                Owner: 'Kamran-saeed'
+                Repo: !Ref RepoName
+                Branch: !Ref BranchName
+                PollForSourceChanges: true
+                OAuthToken: 'c7e2bee44b4514d250d48ab4b516d45464d0aa73'
+              OutputArtifacts:
+                - Name: SourceCode
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              RunOrder: 1
+              InputArtifacts:
+                - Name: SourceCode
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Ref BuildProject
+              OutputArtifacts:
+                - Name: BuildOutput
+        - Name: Deploy
+          Actions:
+            - Name: Approval
+              !If
+            - IsProductionEnvironment
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref CodePipelineSNSTopic
+                CustomData: !Sub 'A new request was created for the ${Environment} stack. Do you want to implement the changes?'
+              RunOrder: '1'
+            - !Ref "AWS::NoValue"
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: '2'
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub "${Project}-main-stack-${Environment}"
+                Capabilities: CAPABILITY_NAMED_IAM
+                TemplateConfiguration: !Sub "BuildOutput::env/${Environment}-parameters.json"
+                TemplatePath: BuildOutput::packagedtemplate.yaml
+                RoleArn: !Ref CodePipelineCloudFormationDeployRole
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner

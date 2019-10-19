@@ -1,0 +1,232 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template will create resources for trivago's cicd pipeline for advertiser accommodation data on AWS.
+
+Parameters:
+  Project:
+    Type: String
+    Description: Project name
+    Default: data-collection
+  
+  Environment:
+    Type: String
+    Description: Environment name
+    AllowedValues: [dev, qa, uat, prd]
+    Default: dev
+
+  Department:
+    Type: String
+    Description: Describe which internal department owns this resource
+    Default: Rnd
+
+  Owner:
+    Type: String
+    Description: E-mail address, used to identify who is responsible for the resource
+    ConstraintDescription: Must be a valid e-mail address (someone@example.com)
+    AllowedPattern: ^(("[\w-\s]+")|([\w-]+(?:\.[\w-]+)*)|("[\w-\s]+")([\w-]+(?:\.[\w-]+)*))(@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,6}(?:\.[a-z]{2})?)$)|(@\[?((25[0-5]\.|2[0-4][0-9]\.|1[0-9]{2}\.|[0-9]{1,2}\.))((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){2}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\]?$)
+
+  bucketversioningstatus:
+    Type: String
+    Description: Versioning status for this bucket which can be suspended or enabled
+    AllowedValues: [Suspended, Enabled]
+    Default: Suspended
+
+  bucketname:
+    Type: String
+    Description: Name of bucket
+    Default: sample-bucket
+  
+  kinesisbufferinterval:
+    Description: Length of time in seconds that Kinesis Data Firehose buffers incoming data before delivering it to the destination
+    Type: Number
+    MinValue: 60
+    MaxValue: 900
+    Default: 60
+  
+  kinesisbuffersize:
+    Description: Size of the buffer in MBs that Kinesis Data Firehose uses for incoming data before delivering it to the destination
+    Type: Number
+    MinValue: 1
+    MaxValue: 128
+    Default: 50
+  
+  kinesiscompressionformat:
+    Description: The compression format. If no value is specified, the default is UNCOMPRESSED
+    Type: String
+    AllowedValues: [GZIP, Snappy, UNCOMPRESSED, ZIP]
+    Default: UNCOMPRESSED
+  
+  kinesisprocessrecordstatus:
+    Description: Indicates whether data processing is enabled (true) or disabled (false)
+    Type: String
+    AllowedValues: [true, false]
+    Default: true
+
+Conditions:
+  IsKinesisProcessRecordStatusTrue: !Equals [ true, !Ref kinesisprocessrecordstatus]
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ["-", [ !Ref Project, !Ref bucketname, !Ref Environment]]
+      VersioningConfiguration:
+        Status: !Ref bucketversioningstatus
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+  
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      RoleName: !Join ["-", [ !Ref Project, 'lambda-role', !Ref Environment]]
+      Path: '/'
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: Lambda.handler
+      Timeout: 5
+      Role: !GetAtt LambdaRole.Arn
+      Code:
+        S3Bucket: !Sub '${Project}-lambda-code-${Environment}'
+        S3Key: 'Lambda.zip'
+      Runtime: python3.7
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+  
+  KinesisDeliveryStreamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: 'sts:AssumeRole'
+      RoleName: !Join ["-", [ !Ref Project, 'kinesis-deliverystream-role', !Ref Environment]]
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Env
+          Value: !Ref Environment
+        - Key: Dept
+          Value: !Ref Department
+        - Key: Owner
+          Value: !Ref Owner
+  
+  KinesisDeliveryStreamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Join ["-", [ !Ref Project, kinesis-deliverystream-policy, !Ref Environment]]
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:AbortMultipartUpload'
+              - 's3:GetBucketLocation'
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:ListBucketMultipartUploads'
+              - 's3:PutObject'
+            Resource:
+              - !Join 
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3Bucket
+              - !Join 
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3Bucket
+                  - '*'
+      Roles:
+        - !Ref KinesisDeliveryStreamRole
+  
+  KinesisLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub '/${Project}/kinesis/firehose/logs'
+      RetentionInDays: 14
+  
+  KinesisLogStream:
+    Type: AWS::Logs::LogStream
+    Properties: 
+      LogGroupName: !Ref KinesisLogGroup
+      LogStreamName: !Sub /${Project}/kinesis/firehose/streams
+
+  KinesisDeliverystream:
+    DependsOn:
+      - KinesisDeliveryStreamPolicy
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Join ["-", [ !Ref Project, 'deliverystream', !Ref Environment]]
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !Join
+          - ''
+          - - 'arn:aws:s3:::'
+            - !Ref S3Bucket
+        BufferingHints:
+          IntervalInSeconds: !Ref kinesisbufferinterval
+          SizeInMBs: !Ref kinesisbuffersize
+        CompressionFormat: !Ref kinesiscompressionformat
+        Prefix: firehose/
+        RoleARN: !GetAtt KinesisDeliveryStreamRole.Arn
+        ProcessingConfiguration:
+          Enabled: !Ref kinesisprocessrecordstatus
+          Processors:
+            -
+              !If
+              - IsKinesisProcessRecordStatusTrue
+              - Parameters:
+                  - ParameterName: LambdaArn
+                    ParameterValue: !GetAtt LambdaFunction.Arn
+                Type: Lambda
+              - !Ref "AWS::NoValue"
+        CloudWatchLoggingOptions: 
+            Enabled: true
+            LogGroupName: !Ref KinesisLogGroup
+            LogStreamName: !Ref KinesisLogStream
+
+Outputs:
+  S3BucketName:
+    Description: S3 bucket name
+    Value: !Ref S3Bucket
+
+  S3BucketArn:
+    Description: S3 bucket Arn
+    Value: !GetAtt S3Bucket.Arn
