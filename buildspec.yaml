@@ -3,13 +3,16 @@ phases:
   install:
     runtime-versions:
       python: 3.7
+    commands:
+      - echo Installing requirements from file
+      - pip install -r requirements.txt -t .
   build:
     commands:
       - cd unpack
       - zip -r function.zip .
       - aws s3 sync . "s3://$S3Bucket/lambda-code"
       - cd .. && cd test
-      - python test_unpack.py
+      - python -m pytest test_unpack.py -v
       - aws cloudformation package --template-file main.yaml --s3-bucket $S3Bucket --output-template-file packagedtemplate.yaml
 artifacts:
   files: '**/*'
