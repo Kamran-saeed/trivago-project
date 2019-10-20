@@ -113,6 +113,7 @@ Resources:
       Handler: unpack.lambda_handler
       Timeout: 5
       Role: !GetAtt LambdaRole.Arn
+      FunctionName: !Join ["-", [ !Ref Project, 'validation-lambda', !Ref Environment]]
       Code:
         S3Bucket: !ImportValue s3bucket-name
         S3Key: 'lambda-code/function.zip'
@@ -180,14 +181,14 @@ Resources:
   KinesisLogGroup:
     Type: AWS::Logs::LogGroup
     Properties: 
-      LogGroupName: !Sub '/${Project}/kinesis/firehose/logs'
+      LogGroupName: !Sub '/${Project}/kinesis/firehose/logs/${Environment}'
       RetentionInDays: 14
   
   KinesisLogStream:
     Type: AWS::Logs::LogStream
     Properties: 
       LogGroupName: !Ref KinesisLogGroup
-      LogStreamName: !Sub /${Project}/kinesis/firehose/streams
+      LogStreamName: !Sub /${Project}/kinesis/firehose/streams/${Environment}
 
   KinesisDeliverystream:
     DependsOn:
