@@ -5,7 +5,7 @@
        "Department": "Rnd",
        "Owner": "kamransaeed1000@gmail.com",
        "bucketversioningstatus": "Suspended",
-       "bucketname": "sample-bucket",
+       "bucketname": "unpack-bucket",
        "kinesisbufferinterval": "60",
        "kinesisbuffersize": "50",
        "kinesiscompressionformat": "UNCOMPRESSED",
